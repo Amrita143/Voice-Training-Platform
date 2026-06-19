@@ -1,0 +1,33 @@
+# deps
+node_modules/
+**/node_modules/
+
+# builds
+apps/web/dist/
+functions/lib/
+packages/shared/dist/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.development
+!**/.env.production
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+sa.json
+
+# firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# misc
+.DS_Store
+*.local
+.vscode/
+.idea/

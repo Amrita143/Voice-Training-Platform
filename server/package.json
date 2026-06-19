@@ -1,0 +1,18 @@
+{
+  "name": "avtp-xai-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "description": "Tiny xAI proxy: mints realtime ephemeral tokens + proxies documents/search, keeping the xAI key off the browser. Verifies Firebase ID tokens (no service account).",
+  "scripts": {
+    "start": "node --env-file=.env index.mjs",
+    "dev": "node --env-file=.env --watch index.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "firebase-admin": "^12.7.0"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "astra-voice-training-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Astra Voice Training Platform — multi-agent xAI voice trainers on Firebase",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "build:shared": "npm run build -w @avtp/shared",
+    "build:web": "npm run build -w apps/web",
+    "build:functions": "npm --prefix functions run build",
+    "build": "npm run build:shared && npm run build:web && npm run build:functions",
+    "install:functions": "npm --prefix functions install",
+    "emulators": "firebase emulators:start",
+    "deploy": "npm run build && firebase deploy"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

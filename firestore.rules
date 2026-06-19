@@ -1,0 +1,125 @@
+rules_version = '2';
+
+// AVTP — Firestore Security Rules (Spark / no Cloud Functions).
+// Auth: Firebase Email/Password (userid -> hidden internal email).
+// Roles live in users/{uid}.role and are read via get() (no custom claims).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function myData() {
+      return get(/databases/$(database)/documents/users/$(me())).data;
+    }
+    function isSuper() { return signedIn() && myData().role == 'superadmin'; }
+    function isAdmin() { return signedIn() && myData().role == 'admin'; }
+    function isStaff() { return isSuper() || isAdmin(); }
+
+    // --- Users -----------------------------------------------------------
+    match /users/{uid} {
+      allow read: if signedIn() && (me() == uid || isStaff());
+      allow create: if isSuper()
+        || (isAdmin() && request.resource.data.role == 'trainee');
+      allow update: if isSuper()
+        || (isAdmin() && resource.data.role == 'trainee'
+            && request.resource.data.role == 'trainee')
+        // a user may edit only benign fields on their own doc
+        || (me() == uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.userid == resource.data.userid);
+      allow delete: if isSuper()
+        || (isAdmin() && resource.data.role == 'trainee');
+    }
+
+    // --- Groups ----------------------------------------------------------
+    match /groups/{id} {
+      allow read: if isStaff()
+        || (signedIn() && me() in resource.data.memberUids);
+      allow write: if isStaff();
+    }
+
+    // --- Agents ----------------------------------------------------------
+    // Trainees may read published agents (UI shows only their assigned set,
+    // resolved from user.assignedAgentIds + their groups' assignedAgentIds).
+    match /agents/{agentId} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.status == 'published');
+      allow create, update, delete: if isSuper();
+    }
+    match /agents/{agentId}/configHistory/{v} {
+      allow read: if isStaff();
+      allow write: if isSuper();
+    }
+
+    // --- Guided Questions (catalog) -------------------------------------
+    match /catalogs/{id}  { allow read: if signedIn(); allow write: if isStaff(); }
+    match /tracks/{id}    { allow read: if signedIn(); allow write: if isStaff(); }
+    match /sections/{id}    { allow read: if signedIn(); allow write: if isStaff(); }
+    match /subsections/{id} { allow read: if signedIn(); allow write: if isStaff(); }
+    match /questions/{id}   { allow read: if signedIn(); allow write: if isStaff(); }
+
+    // --- Assignments -----------------------------------------------------
+    match /assignments/{id} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.subjectType == 'user'
+            && resource.data.subjectId == me());
+      allow write: if isStaff();
+    }
+
+    // --- Sessions + traces (trainee writes own; staff read all) ----------
+    match /sessions/{sid} {
+      allow read: if signedIn() && (resource.data.userId == me() || isStaff());
+      allow create: if signedIn() && request.resource.data.userId == me();
+      allow update: if signedIn() && resource.data.userId == me();
+      allow delete: if isStaff();
+      match /events/{eid} {
+        function sessionOwner() {
+          return get(/databases/$(database)/documents/sessions/$(sid)).data.userId;
+        }
+        allow read: if signedIn() && (sessionOwner() == me() || isStaff());
+        allow create: if signedIn() && sessionOwner() == me();
+        allow delete: if isStaff();
+      }
+    }
+
+    // --- Usage (derived from sessions in v1; staff read) -----------------
+    match /usageCounters/{id} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // --- Live sessions (heartbeat presence for GLOBAL concurrency) --------
+    // Readable by any signed-in user so a trainee's client can count total
+    // active sessions platform-wide; each user writes only their own doc.
+    match /liveSessions/{id} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.userId == me();
+      allow delete: if signedIn() && (resource.data.userId == me() || isStaff());
+    }
+
+    // --- Error logs (rate limits / failures; staff read) -----------------
+    match /errorLogs/{id} {
+      allow read: if isStaff();
+      allow create: if signedIn();
+      allow update, delete: if isSuper();
+    }
+
+    // --- Settings --------------------------------------------------------
+    // Readable by any signed-in user (the trainee client reads global limits to
+    // enforce them); only superadmin may change them.
+    match /settings/{id} {
+      allow read: if signedIn();
+      allow write: if isSuper();
+    }
+
+    // --- Audit logs ------------------------------------------------------
+    match /auditLogs/{id} {
+      allow read: if isSuper();
+      allow create: if isStaff();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,39 @@
+name: Deploy
+
+# Auto-deploy the web app + Firestore rules on every push to main.
+# (The xAI proxy in server/ deploys separately via Render — see DEPLOY.md.)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  firebase:
+    name: Web + Firestore rules → Firebase
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package + web app
+        run: |
+          npm run build:shared
+          npm run build:web
+
+      - name: Deploy to Firebase (hosting + firestore rules)
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@latest deploy \
+            --only hosting,firestore:rules \
+            --project astra-voice-training \
+            --non-interactive
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
