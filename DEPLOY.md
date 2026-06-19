@@ -7,10 +7,10 @@ After this is set up, **`git push` to `main` redeploys the whole app automatical
 | Piece | Where | How |
 |---|---|---|
 | **Web app** (`apps/web`) + **Firestore rules** | Firebase Hosting | **GitHub Actions** (`.github/workflows/deploy.yml`) |
-| **xAI proxy** (`server/`) — mints tokens, proxies search | A Node host (**Render** free tier) | Render auto-deploy from the same repo |
+| **xAI proxy** (`server/`) — mints tokens, proxies search | **Railway** (Node service) | Railway auto-deploy from the same repo (`server/railway.json`) |
 
 > The proxy must be hosted for voice to work on the live site for everyone. On the
-> Spark plan there are no Cloud Functions, so we use a tiny external Node host.
+> Spark plan there are no Cloud Functions, so we use a tiny external Node host (Railway).
 > The browser only ever gets short-lived ephemeral tokens — the **xAI key stays on the proxy**.
 
 ---
@@ -58,19 +58,24 @@ delete it so only `deploy.yml` runs.)
 
 Done — push to `main` now builds and deploys the web app + rules.
 
-### 3. Host the xAI proxy on Render
-1. Create a free account at render.com and connect your GitHub.
-2. **New → Blueprint** → pick this repo. It reads `render.yaml` and creates the
-   `avtp-xai-proxy` web service (root dir `server/`, start `node index.mjs`).
-3. In the service's **Environment**, set **`XAI_API_KEY`** (the value from `server/.env`).
-   `GCLOUD_PROJECT` is already set by the blueprint. (Render injects `PORT` automatically.)
-4. Deploy. Note the URL, e.g. `https://avtp-xai-proxy.onrender.com`. Check it:
-   `https://avtp-xai-proxy.onrender.com/health` → `{"ok":true,...}`.
+### 3. Host the xAI proxy on Railway
+1. Sign in at railway.com with GitHub.
+2. **New Project → Deploy from GitHub repo** → pick `Voice-Training-Platform`.
+3. Open the service → **Settings → Source** → set **Root Directory = `server`**
+   (the repo is a monorepo; this points Railway at the proxy). It picks up
+   `server/railway.json` (start `node index.mjs`, health check `/health`).
+4. **Settings → Variables** → add:
+   - `XAI_API_KEY` = your xAI key (from `server/.env`)
+   - `GCLOUD_PROJECT` = `astra-voice-training`
+   (Railway injects `PORT` automatically; the proxy reads it.)
+5. **Settings → Networking → Generate Domain** → you get a public URL, e.g.
+   `https://voice-training-platform-production.up.railway.app`.
+   Check it: open `<that-url>/health` → `{"ok":true,...}`.
 
 ### 4. Point the live site at the hosted proxy
 Edit `apps/web/.env.production`:
 ```
-VITE_API_BASE=https://avtp-xai-proxy.onrender.com
+VITE_API_BASE=https://<your-railway-domain>.up.railway.app
 ```
 Commit + push → GitHub Actions rebuilds the web app against the hosted proxy.
 
@@ -90,10 +95,10 @@ Watch runs under the repo's **Actions** tab and in the Render dashboard.
 ---
 
 ## Notes & gotchas
-- **Render free tier sleeps** after ~15 min idle → the first "Start" after a quiet
-  period waits ~30–60s while it wakes. Upgrade to a paid instance (or add an
-  uptime pinger hitting `/health`) if that matters. Alternatives: Railway, Fly.io,
-  or Cloud Run (Cloud Run needs Blaze billing).
+- **Railway** doesn't sleep, so there's no cold-start delay before voice (good for
+  this app). It's usage-based on the ~$5/mo Hobby plan (no permanent free tier).
+  Railway auto-redeploys the proxy on every push that touches `server/`. Alternatives:
+  Render (free tier but sleeps), Fly.io, or Cloud Run (needs Blaze billing).
 - **Manual deploy still works** any time (no CI): from the repo root
   `npm run build:shared && npm run build:web` then
   `npx -y firebase-tools@latest deploy --only hosting,firestore:rules --project astra-voice-training`.

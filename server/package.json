@@ -6,8 +6,8 @@
   "main": "index.mjs",
   "description": "Tiny xAI proxy: mints realtime ephemeral tokens + proxies documents/search, keeping the xAI key off the browser. Verifies Firebase ID tokens (no service account).",
   "scripts": {
-    "start": "node --env-file=.env index.mjs",
-    "dev": "node --env-file=.env --watch index.mjs"
+    "start": "node --env-file-if-exists=.env index.mjs",
+    "dev": "node --env-file-if-exists=.env --watch index.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
