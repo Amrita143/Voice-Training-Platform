@@ -29,11 +29,21 @@ jobs:
 
       - name: Deploy to Firebase (hosting + firestore rules)
         run: |
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          # Auth via EITHER a CI token (FIREBASE_TOKEN, simplest) OR a service
+          # account JSON (FIREBASE_SERVICE_ACCOUNT). Set one of them as a repo secret.
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            echo "Using FIREBASE_TOKEN"
+          elif [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+            export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          else
+            echo "::error::Set a repo secret: FIREBASE_TOKEN (from 'firebase login:ci') or FIREBASE_SERVICE_ACCOUNT (SA JSON)."
+            exit 1
+          fi
           npx --yes firebase-tools@latest deploy \
             --only hosting,firestore:rules \
             --project astra-voice-training \
             --non-interactive
         env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

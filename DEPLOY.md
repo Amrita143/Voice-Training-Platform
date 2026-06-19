@@ -32,20 +32,29 @@ service-account JSON. The committed `apps/web/.env.production` holds only the **
 Firebase web config (not a secret).
 
 ### 2. Give GitHub Actions permission to deploy to Firebase
-Easiest (auto-creates a correctly-scoped service account + the GitHub secret):
-```bash
-# from the repo root, using the standalone Node 22 npx:
-npx -y firebase-tools@latest init hosting:github
-```
-- Choose the existing repo, **don't** overwrite the workflow we ship.
-- It creates a service account and stores it as a repo secret. **Rename that secret
-  (or copy its value) to `FIREBASE_SERVICE_ACCOUNT`** — that's the name our workflow reads.
+The workflow accepts **either** secret below — pick one.
 
-Manual alternative: Firebase Console → ⚙ Project settings → **Service accounts** →
-**Generate new private key** → in GitHub: repo **Settings → Secrets and variables →
-Actions → New repository secret**, name `FIREBASE_SERVICE_ACCOUNT`, paste the whole JSON.
-(The SA needs Firebase Hosting Admin + Cloud Datastore/Firestore roles; the
-`init hosting:github` path sets these for you.)
+> Note: `firebase init hosting:github` tries to auto-create a service account via the
+> GCP IAM API and can fail with `Service account ... does not exist` (404) when the
+> IAM API isn't enabled / you can't create SAs. Use one of these instead:
+
+**Option A — CI token (simplest, no IAM/service account):**
+```bash
+npx -y firebase-tools@latest login:ci
+```
+Authorize in the browser; it prints a token. In GitHub: repo **Settings → Secrets and
+variables → Actions → New repository secret**, name **`FIREBASE_TOKEN`**, paste the token.
+
+**Option B — Service account (more "proper", not deprecated):**
+1. Google Cloud Console → **IAM & Admin → Service Accounts** (project `astra-voice-training`)
+   → **Create service account** (e.g. `github-deployer`).
+2. Grant it the **Firebase Admin** role (`roles/firebase.admin` — covers hosting + rules).
+   If a deploy later complains about a missing permission, also add **Service Usage Consumer**.
+3. Open the SA → **Keys → Add key → JSON** → download.
+4. GitHub repo secret named **`FIREBASE_SERVICE_ACCOUNT`** = the entire JSON.
+
+(If `init hosting:github` had already written its own `.github/workflows/firebase-*.yml`,
+delete it so only `deploy.yml` runs.)
 
 Done — push to `main` now builds and deploys the web app + rules.
 
