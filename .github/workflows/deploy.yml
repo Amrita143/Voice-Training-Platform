@@ -34,6 +34,7 @@ jobs:
           if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
             printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
             export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+            unset FIREBASE_TOKEN  # firebase-tools prefers the token over the SA — remove it
             echo "Authenticating with service account."
           elif [ -n "$FIREBASE_TOKEN" ]; then
             echo "Authenticating with FIREBASE_TOKEN (deprecated)."
